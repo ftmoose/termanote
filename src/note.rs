@@ -47,7 +47,7 @@ impl Note {
     statement.execute(params![]).expect("Failed to create table");
   }
 
-  pub fn find_by_title(title: &String) -> Option<Note> {
+  pub fn find_by_title(title: &String, create: bool) -> Note {
     let conn = db::connect();
     let mut statement = conn.prepare(
       "SELECT id, title, content FROM note WHERE title = ?1"
@@ -61,9 +61,20 @@ impl Note {
       })
     }).unwrap().collect::<Result<Vec<Note>, _>>().expect("Failed to collect note");
 
-    println!("{}", notes.len());
+    let note = match notes.into_iter().nth(0) {
+      Some(note) => Some(note),
+      None => if create {
+        Some(Note::new(title))
+      } else {
+        None
+      },
+    }; 
 
-    notes.into_iter().nth(0)
+    if note.is_none() {
+      panic!("Note '{}' does not exist", title)
+    }
+
+    note.unwrap()
   }
 
   pub fn all_notes() -> Result<Vec<Note>, rusqlite::Error> {
@@ -105,10 +116,7 @@ pub fn run_note(title: &String) {
 
   // find or create note
   let title = &title.clone().trim().to_lowercase();
-  let mut note = match Note::find_by_title(title) {
-    Some(note) => note,
-    None => Note::new(title),
-  };
+  let mut note = Note::find_by_title(title, false);
 
   println!("New note id: {}", note.id);
 
